@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CarHelper — Instrument Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-display:'Chakra Petch',ui-sans-serif,system-ui,sans-serif;
+  --font-body:'Hanken Grotesk',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-mono:'Spline Sans Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --r:14px; --r-sm:10px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+/* ---------- DARK (default) ---------- */
+html[data-theme="dark"]{
+  --bg:#0a0d11; --bg-2:#0d1117;
+  --surface:#12181f; --surface-2:#161d26; --inset:#0c1117;
+  --line:#222c38; --line-soft:#1a222c;
+  --text:#e9eef4; --text-dim:#94a1b2; --text-faint:#5d6b7a;
+  --accent:#ffb43d; --accent-ink:#2a1a00; --accent-soft:#3a2c12;
+  --teal:#37d8b6; --info:#5fa0f2; --watch:#f2b740; --action:#ff5d52; --ok:#37d8b6;
+  --glow-a:rgba(255,180,61,.13); --glow-b:rgba(55,216,182,.10);
+  --shadow:0 1px 0 rgba(255,255,255,.03),0 18px 40px -22px rgba(0,0,0,.85);
+  --tile-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+  --grid-line:rgba(255,255,255,.022);
+}
+/* ---------- LIGHT ---------- */
+html[data-theme="light"]{
+  --bg:#e7ecf1; --bg-2:#eef2f6;
+  --surface:#ffffff; --surface-2:#f6f9fc; --inset:#eef3f8;
+  --line:#d6dfe8; --line-soft:#e6ecf2;
+  --text:#13202b; --text-dim:#566472; --text-faint:#8d9caa;
+  --accent:#d97a14; --accent-ink:#ffffff; --accent-soft:#fbe9d2;
+  --teal:#0f9c83; --info:#2c6fd1; --watch:#bd7e10; --action:#d23a2f; --ok:#0f9c83;
+  --glow-a:rgba(217,122,20,.10); --glow-b:rgba(15,156,131,.08);
+  --shadow:0 1px 2px rgba(20,40,60,.05),0 18px 36px -24px rgba(30,50,70,.30);
+  --tile-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  --grid-line:rgba(30,50,70,.04);
+}
+*{box-sizing:border-box}
+/* the hidden attribute must win over display:grid/flex on .stack/.modal etc. */
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;color:var(--text);background:var(--bg);
+  font:15px/1.55 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(700px 360px at 12% -8%,var(--glow-a),transparent 60%),
+    radial-gradient(760px 420px at 100% 0%,var(--glow-b),transparent 60%),
+    linear-gradient(var(--grid-line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:auto,auto,28px 28px,28px 28px;
+  background-attachment:fixed;
+}
+::selection{background:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  display:flex;align-items:center;gap:16px;
+  padding:14px clamp(16px,4vw,40px);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand svg{flex:none}
+.brand .mark{width:34px;height:34px;color:var(--accent)}
+.wordmark{display:flex;flex-direction:column;line-height:1;min-width:0}
+.wordmark b{
+  font:600 19px/1 var(--font-display);letter-spacing:.12em;
+}
+.wordmark span{font-size:11px;color:var(--text-dim);letter-spacing:.22em;text-transform:uppercase;margin-top:4px}
+.spacer{flex:1}
+.pill{
+  display:inline-flex;align-items:center;gap:8px;
+  font:500 12.5px/1 var(--font-body);color:var(--text-dim);
+  border:1px solid var(--line);background:var(--surface);
+  padding:7px 12px;border-radius:999px;white-space:nowrap;
+}
+.badge{
+  font:600 11px/1 var(--font-display);letter-spacing:.14em;
+  padding:6px 11px;border-radius:999px;border:1px solid var(--line);
+  color:var(--text-dim);background:var(--surface);
+}
+.badge.live{color:var(--teal);border-color:color-mix(in srgb,var(--teal) 45%,var(--line))}
+.badge.sim{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--text-faint);position:relative;flex:none}
+.dot.on{background:var(--teal)}
+.dot.on::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid var(--teal);opacity:.5;animation:ping 1.8s var(--ease) infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+.iconbtn{
+  display:grid;place-items:center;width:38px;height:38px;flex:none;
+  border:1px solid var(--line);background:var(--surface);color:var(--text);
+  border-radius:10px;cursor:pointer;transition:.18s var(--ease);
+}
+.iconbtn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.iconbtn svg{width:18px;height:18px}
+.theme-moon{display:none}
+html[data-theme="dark"] .theme-sun{display:none}
+html[data-theme="dark"] .theme-moon{display:block}
+
+/* ---------- layout ---------- */
+main{max-width:1120px;margin:0 auto;padding:clamp(18px,3vw,34px) clamp(16px,4vw,40px) 64px}
+.stack{display:grid;gap:18px}
+.panel{
+  background:var(--surface);border:1px solid var(--line-soft);
+  border-radius:var(--r);box-shadow:var(--shadow);
+  padding:18px 18px;opacity:0;transform:translateY(10px);
+  animation:rise .6s var(--ease) forwards;
+}
+.panel.d1{animation-delay:.04s}.panel.d2{animation-delay:.10s}
+.panel.d3{animation-delay:.16s}.panel.d4{animation-delay:.22s}
+@keyframes rise{to{opacity:1;transform:none}}
+.label{
+  font:600 11px/1 var(--font-display);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--text-faint);margin:0 0 14px;display:flex;align-items:center;gap:9px;
+}
+.label::after{content:"";height:1px;flex:1;background:var(--line-soft)}
+
+/* ---------- control deck ---------- */
+.deck{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.statecore{display:flex;align-items:center;gap:16px;min-width:0}
+.ring{
+  width:54px;height:54px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--inset);border:1px solid var(--line);position:relative;
+}
+.ring i{width:14px;height:14px;border-radius:50%;background:var(--text-faint);transition:.3s var(--ease)}
+.deck[data-state="connected"] .ring i,.deck[data-state="recording"] .ring i{background:var(--teal)}
+.deck[data-state="recording"] .ring{border-color:color-mix(in srgb,var(--action) 60%,var(--line))}
+.deck[data-state="recording"] .ring i{background:var(--action);animation:rec 1.3s steps(1) infinite}
+@keyframes rec{50%{opacity:.25}}
+.statetext b{font:600 16px/1.2 var(--font-display);letter-spacing:.04em;display:block}
+.statetext small{color:var(--text-dim);font-size:12.5px;display:block;margin-top:3px;max-width:42ch}
+.actions{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap}
+button{font:inherit;cursor:pointer}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;
+  font:600 14.5px/1 var(--font-body);letter-spacing:.01em;
+  color:var(--text);background:var(--surface-2);
+  border:1px solid var(--line);padding:13px 20px;border-radius:11px;
+  transition:.18s var(--ease);
+}
+.btn:hover{transform:translateY(-1px);border-color:var(--text-faint)}
+.btn:active{transform:translateY(0)}
+.btn svg{width:17px;height:17px}
+.btn.primary{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 92%,#fff),var(--accent));
+  color:var(--accent-ink);border-color:transparent;
+  box-shadow:0 10px 26px -12px color-mix(in srgb,var(--accent) 75%,transparent);
+}
+.btn.primary:hover{filter:brightness(1.04)}
+.btn.danger{color:var(--action);border-color:color-mix(in srgb,var(--action) 35%,var(--line));background:color-mix(in srgb,var(--action) 8%,var(--surface-2))}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.note{margin:14px 0 0;font-size:13px;color:var(--watch);display:flex;gap:9px;align-items:flex-start}
+.note svg{width:16px;height:16px;flex:none;margin-top:1px}
+
+/* ---------- trip HUD ---------- */
+.hud{display:none;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;
+  padding-top:14px;border-top:1px dashed var(--line)}
+.deck[data-state="recording"] .hud{display:flex}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;font:500 13px/1 var(--font-body);
+  color:var(--text-dim);background:var(--inset);border:1px solid var(--line-soft);
+  padding:8px 12px;border-radius:9px;
+}
+.chip b{font-family:var(--font-mono);color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+.chip.rec{color:var(--action);border-color:color-mix(in srgb,var(--action) 30%,var(--line))}
+.chip.rec .recdot{width:8px;height:8px;border-radius:50%;background:var(--action);animation:rec 1.3s steps(1) infinite}
+
+/* ---------- live hero ---------- */
+.live-grid{display:grid;grid-template-columns:minmax(240px,300px) 1fr;gap:22px;align-items:start}
+@media(max-width:780px){.live-grid{grid-template-columns:1fr}}
+.cluster{display:flex;flex-direction:column;align-items:center;gap:16px}
+.gauge{width:100%;max-width:260px;aspect-ratio:1;overflow:visible}
+.gauge .track{fill:none;stroke:var(--line);stroke-width:13;stroke-linecap:round}
+.gauge .val{fill:none;stroke:url(#gg);stroke-width:13;stroke-linecap:round;
+  transition:stroke-dasharray .4s var(--ease)}
+.gauge .tick{stroke:var(--line);stroke-width:2}
+.gnum{font:600 46px/1 var(--font-mono);fill:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.gunit{font:600 12px/1 var(--font-display);fill:var(--text-faint);letter-spacing:.22em}
+.gcap{font:500 11px/1 var(--font-mono);fill:var(--text-faint)}
+.tach{width:100%;max-width:260px}
+.tach-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.tach-head .k{font:600 10px/1 var(--font-display);letter-spacing:.18em;text-transform:uppercase;color:var(--text-faint)}
+.tach-head .v{font:500 15px/1 var(--font-mono);color:var(--text);font-variant-numeric:tabular-nums}
+.tach-bar{height:10px;border-radius:6px;background:var(--inset);border:1px solid var(--line-soft);overflow:hidden;position:relative}
+.tach-fill{height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--teal),var(--accent));transition:width .35s var(--ease),background .3s}
+.tach-fill.warn{background:linear-gradient(90deg,var(--accent),var(--watch))}
+.tach-fill.red{background:linear-gradient(90deg,var(--watch),var(--action))}
+.tach-red{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--action);opacity:.55}
+
+/* ---------- vitals ---------- */
+.vitals{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.tile{
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-sm);
+  padding:12px 13px 11px;box-shadow:var(--tile-shadow);position:relative;overflow:hidden;
+  transition:.2s var(--ease);
+}
+.tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:.2s}
+.tile:hover{transform:translateY(-2px);border-color:var(--line)}
+.tile[data-status="ok"]::before{background:var(--ok)}
+.tile[data-status="watch"]{border-color:color-mix(in srgb,var(--watch) 45%,var(--line-soft))}
+.tile[data-status="watch"]::before{background:var(--watch)}
+.tile[data-status="action"]{border-color:color-mix(in srgb,var(--action) 55%,var(--line-soft));background:color-mix(in srgb,var(--action) 7%,var(--surface-2))}
+.tile[data-status="action"]::before{background:var(--action)}
+.tile-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.tile .k{font:500 11px/1.2 var(--font-body);color:var(--text-dim);letter-spacing:.01em}
+.tile canvas{width:64px;height:22px;display:block;opacity:.9}
+.tile .v{font:500 27px/1 var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;display:flex;align-items:baseline;gap:5px}
+.tile .v .u{font-size:12px;color:var(--text-faint);font-weight:500;letter-spacing:.02em}
+
+/* ---------- findings ---------- */
+.finding{
+  display:flex;gap:13px;padding:14px;border-radius:var(--r-sm);margin-bottom:10px;
+  background:var(--surface-2);border:1px solid var(--line-soft);
+  border-left:3px solid var(--line);animation:rise .4s var(--ease) both;
+}
+.finding:last-child{margin-bottom:0}
+.finding.info{border-left-color:var(--info)}
+.finding.watch{border-left-color:var(--watch)}
+.finding.action{border-left-color:var(--action);background:color-mix(in srgb,var(--action) 6%,var(--surface-2))}
+.finding .ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none}
+.finding.info .ic{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.finding.watch .ic{background:color-mix(in srgb,var(--watch) 18%,transparent);color:var(--watch)}
+.finding.action .ic{background:color-mix(in srgb,var(--action) 18%,transparent);color:var(--action)}
+.finding .ic svg{width:18px;height:18px}
+.finding .body{min-width:0}
+.finding .row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.finding .t{font-weight:600;font-size:14.5px}
+.finding .sev{font:600 10px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:6px}
+.sev.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.sev.watch{background:color-mix(in srgb,var(--watch) 18%,transparent);color:var(--watch)}
+.sev.action{background:color-mix(in srgb,var(--action) 18%,transparent);color:var(--action)}
+.finding .d{color:var(--text-dim);font-size:13.5px;margin-top:4px}
+.empty{display:flex;align-items:center;gap:12px;color:var(--text-dim);font-size:14px;padding:8px 2px}
+.empty.good{color:var(--teal)}
+.empty svg{width:22px;height:22px;flex:none}
+
+/* ---------- trips ---------- */
+.trip{
+  display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;
+  padding:13px 14px;border-radius:var(--r-sm);border:1px solid var(--line-soft);
+  background:var(--surface-2);margin-bottom:10px;
+}
+.del{display:grid;place-items:center;min-width:34px;height:34px;padding:0 9px;flex:none;
+  border:1px solid var(--line-soft);background:var(--surface);color:var(--text-faint);
+  border-radius:9px;cursor:pointer;font:600 12px/1 var(--font-body);transition:.15s var(--ease)}
+.del:hover{color:var(--action);border-color:color-mix(in srgb,var(--action) 40%,var(--line))}
+.del svg{width:16px;height:16px}
+.del.armed{color:#fff;background:var(--action);border-color:transparent;padding:0 13px}
+.trip:last-child{margin-bottom:0}
+.trip .id{font:500 13px/1 var(--font-mono);color:var(--text-faint)}
+.trip .meta b{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.trip .meta .dt{font-weight:600;font-size:14px}
+.trip .meta small{color:var(--text-dim);font-size:12.5px;display:block;margin-top:2px}
+.trip .ftitles{color:var(--text-dim);font-size:12px;margin-top:3px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tag{font:600 11px/1 var(--font-mono);padding:5px 8px;border-radius:7px;font-variant-numeric:tabular-nums}
+.tag.action{background:color-mix(in srgb,var(--action) 16%,transparent);color:var(--action)}
+.tag.watch{background:color-mix(in srgb,var(--watch) 18%,transparent);color:var(--watch)}
+.tag.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.tag.clean{background:color-mix(in srgb,var(--teal) 15%,transparent);color:var(--teal)}
+
+/* ---------- footer ---------- */
+.foot{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+  margin-top:26px;color:var(--text-faint);font-size:12.5px;text-align:center}
+.foot .lock{display:inline-flex;align-items:center;gap:7px;color:var(--teal)}
+.foot .lock svg{width:14px;height:14px}
+.foot code{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);background:var(--inset);padding:2px 6px;border-radius:5px}
+
+/* ---------- tabs ---------- */
+.tabs{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px}
+.tab{border:none;background:none;color:var(--text-dim);font:600 13px/1 var(--font-body);padding:8px 14px;border-radius:8px;cursor:pointer;transition:.15s var(--ease)}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--surface-2);color:var(--text);box-shadow:var(--tile-shadow)}
+.count{font:600 11px/1 var(--font-mono);color:var(--accent);background:var(--accent-soft);padding:3px 8px;border-radius:999px;letter-spacing:0;margin-left:2px}
+
+/* ---------- all sensors ---------- */
+.sensors{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px}
+.sensor{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 12px;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:9px}
+.sensor .sk{font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sensor .sv{font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.sensor .sv .u{color:var(--text-faint);font-size:11px;margin-left:3px}
+
+/* ---------- diagnostics page ---------- */
+.codehead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.readonly{display:flex;align-items:center;gap:7px;color:var(--teal);font-size:12.5px;margin:0}
+.readonly svg{width:14px;height:14px;flex:none}
+.mil{display:flex;align-items:center;gap:16px;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--surface-2);margin-bottom:8px}
+.mil .lamp{width:58px;height:58px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--inset);color:var(--text-faint)}
+.mil.on .lamp{background:color-mix(in srgb,var(--action) 18%,transparent);color:var(--action)}
+.mil.off .lamp{background:color-mix(in srgb,var(--teal) 15%,transparent);color:var(--teal)}
+.mil .lamp svg{width:30px;height:30px}
+.mil b{font:600 18px/1.2 var(--font-display);display:block;letter-spacing:.02em}
+.mil small{color:var(--text-dim);font-size:13px}
+.subhead{font:600 11px/1 var(--font-display);letter-spacing:.16em;text-transform:uppercase;color:var(--text-faint);margin:20px 0 11px}
+.monitors{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:8px}
+.mon{display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:9px;font-size:13px}
+.mon .md{width:8px;height:8px;border-radius:50%;flex:none}
+.mon.ready .md{background:var(--teal)} .mon.notready .md{background:var(--watch)}
+.mon .ms{margin-left:auto;font-size:11px;font-weight:600}
+.mon.ready .ms{color:var(--teal)} .mon.notready .ms{color:var(--watch)}
+.code{display:flex;gap:14px;align-items:center;padding:13px 14px;border-radius:10px;border:1px solid var(--line-soft);
+  background:var(--surface-2);margin-bottom:9px;border-left:3px solid var(--action)}
+.code.pending{border-left-color:var(--watch)}
+.code .cc{font:600 16px/1 var(--font-mono);color:var(--text);flex:none}
+.code .cd{color:var(--text-dim);font-size:13.5px}
+
+/* ---------- saved adapter row ---------- */
+.adapter{display:none;align-items:center;gap:12px;margin-top:14px;padding-top:13px;
+  border-top:1px dashed var(--line);font-size:13px;color:var(--text-dim);flex-wrap:wrap}
+.adapter b{color:var(--text);font-weight:600}
+.link{background:none;border:none;color:var(--accent);font:600 13px/1 var(--font-body);
+  cursor:pointer;padding:4px 2px;border-radius:6px}
+.link:hover{text-decoration:underline}
+.link.danger{color:var(--action)}
+
+/* ---------- device picker ---------- */
+.modal{position:fixed;inset:0;z-index:80;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--bg) 55%,rgba(0,0,0,.6));backdrop-filter:blur(5px);
+  animation:fade .2s var(--ease)}
+.modal[hidden]{display:none}
+@keyframes fade{from{opacity:0}}
+.sheet{width:min(440px,92vw);background:var(--surface);border:1px solid var(--line);
+  border-radius:18px;box-shadow:var(--shadow);padding:20px;animation:rise .35s var(--ease)}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet-head h3{margin:0;font:600 17px/1 var(--font-display);letter-spacing:.04em}
+.sheet-sub{color:var(--text-dim);font-size:13px;margin:9px 0 15px;line-height:1.5}
+.sheet-sub b{color:var(--text)}
+.devlist{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin-bottom:15px}
+.dev{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:11px;
+  padding:11px 13px;cursor:pointer;transition:.16s var(--ease);color:var(--text)}
+.dev:hover{border-color:var(--accent);transform:translateY(-1px)}
+.dev .bt{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;
+  background:var(--inset);color:var(--accent)}
+.dev .bt svg{width:17px;height:17px}
+.dev .nm{font-weight:600;font-size:14px;display:block}
+.dev .mc{font:500 11.5px/1.3 var(--font-mono);color:var(--text-faint);display:block;margin-top:2px}
+.dev .go{margin-left:auto;color:var(--text-faint)}
+.devmsg{display:flex;flex-direction:column;align-items:center;gap:13px;padding:28px 12px;
+  color:var(--text-dim);font-size:13.5px;text-align:center;line-height:1.5}
+.spinner{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);
+  border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sheet-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ---------- toasts ---------- */
+#toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:60;
+  display:flex;flex-direction:column;gap:9px;align-items:center;pointer-events:none}
+.toast{
+  display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:500;
+  background:var(--surface);color:var(--text);border:1px solid var(--line);
+  box-shadow:var(--shadow);padding:11px 16px;border-radius:11px;
+  animation:toastin .3s var(--ease);
+}
+.toast .b{width:8px;height:8px;border-radius:50%;background:var(--teal)}
+.toast.err .b{background:var(--action)} .toast.warn .b{background:var(--watch)}
+@keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;transition-duration:.001s!important}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <circle cx="16" cy="16" r="13.5" stroke="currentColor" stroke-width="2"/>
+      <path d="M16 16L23 10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="2.4" fill="currentColor"/>
+      <path d="M6.5 19a10 10 0 0 1 19 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    <div class="wordmark">
+      <b>CARHELPER</b>
+      <span id="vehicle">Vehicle diagnostics</span>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="codes">Diagnostics</button>
+  </nav>
+  <div class="spacer"></div>
+  <span class="badge" id="modeBadge">—</span>
+  <span class="pill" id="connPill"><span class="dot" id="dot"></span><span id="connText">disconnected</span></span>
+  <button class="iconbtn" id="themeBtn" aria-label="Toggle light/dark theme" title="Toggle theme">
+    <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>
+    <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5Z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div id="viewDashboard" class="stack">
+  <!-- control deck -->
+  <section class="panel d1">
+    <div class="deck" id="deck" data-state="disconnected">
+      <div class="statecore">
+        <div class="ring"><i></i></div>
+        <div class="statetext">
+          <b id="stateTitle">Disconnected</b>
+          <small id="stateDetail">Connect to your adapter to begin.</small>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="primaryBtn">
+          <svg id="primaryIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <span id="primaryLabel">Connect</span>
+        </button>
+        <button class="btn ghost" id="disconnectBtn" style="display:none">Disconnect</button>
+      </div>
+    </div>
+    <p class="note" id="connectNote" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9.5"/></svg>
+      <span>Press the physical <b>Connect button</b> on your vLinker MC+ adapter first, then click Connect.</span>
+    </p>
+    <div class="adapter" id="adapter">
+      <span>Saved adapter: <b id="adapterName">—</b></span>
+      <span class="spacer"></span>
+      <button class="link" id="changeBtn">Pair a different device</button>
+      <button class="link danger" id="forgetBtn">Forget device</button>
+    </div>
+    <div class="hud" id="hud">
+      <span class="chip rec"><span class="recdot"></span>RECORDING</span>
+      <span class="chip">Elapsed <b id="hudTime">0:00</b></span>
+      <span class="chip">Distance <b id="hudDist">0.0</b> mi</span>
+      <span class="chip">Samples <b id="hudSamples">0</b></span>
+      <span class="chip">Findings <b id="hudFind">0</b></span>
+    </div>
+  </section>
+
+  <!-- live hero -->
+  <section class="panel d2">
+    <h2 class="label">Live telemetry</h2>
+    <div class="live-grid">
+      <div class="cluster">
+        <svg class="gauge" viewBox="0 0 200 200" role="img" aria-label="Speed gauge">
+          <defs>
+            <linearGradient id="gg" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stop-color="var(--teal)"/><stop offset="1" stop-color="var(--accent)"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="100" cy="100" r="82" transform="rotate(135 100 100)"/>
+          <circle class="val" id="gArc" cx="100" cy="100" r="82" transform="rotate(135 100 100)"/>
+          <g id="gTicks"></g>
+          <text class="gnum" id="gNum" x="100" y="104" text-anchor="middle">0</text>
+          <text class="gunit" x="100" y="128" text-anchor="middle">M P H</text>
+          <text class="gcap" x="42" y="168" text-anchor="middle">0</text>
+          <text class="gcap" x="158" y="168" text-anchor="middle">120</text>
+        </svg>
+        <div class="tach">
+          <div class="tach-head"><span class="k">Engine RPM</span><span class="v" id="tachNum">0</span></div>
+          <div class="tach-bar"><div class="tach-fill" id="tachFill"></div><div class="tach-red" style="left:78.5%"></div></div>
+        </div>
+      </div>
+      <div class="vitals" id="vitals"></div>
+    </div>
+  </section>
+
+  <!-- findings -->
+  <section class="panel d3">
+    <h2 class="label">Current-trip findings</h2>
+    <div id="findings"></div>
+  </section>
+
+  <!-- trips -->
+  <section class="panel d4">
+    <h2 class="label">Recent trips</h2>
+    <div id="trips"></div>
+  </section>
+
+  <!-- all detected sensors -->
+  <section class="panel">
+    <h2 class="label">All detected sensors <span class="count" id="sensorCount"></span></h2>
+    <div class="sensors" id="sensors"><span class="muted">Connect to detect the sensors your vehicle supports.</span></div>
+  </section>
+  </div><!-- /viewDashboard -->
+
+  <!-- diagnostics page -->
+  <div id="viewCodes" class="stack" hidden>
+    <section class="panel">
+      <div class="codehead">
+        <div>
+          <h2 class="label" style="margin-bottom:7px">Diagnostic trouble codes</h2>
+          <p class="readonly">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>
+            Read-only — reading codes never changes your car or clears anything.
+          </p>
+        </div>
+        <button class="btn" id="readCodes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+          Read codes
+        </button>
+      </div>
+      <div id="codesBody"><div class="empty">Connect to the car, then read codes.</div></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <span class="lock">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>
+      Read-only — CarHelper never sends commands to your car.
+    </span>
+    <span>Trips are saved to <code>data/</code> for analysis with Claude Code.</span>
+  </div>
+</main>
+
+<div class="modal" id="picker" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Pair an adapter">
+    <div class="sheet-head">
+      <h3>Pair an adapter</h3>
+      <button class="iconbtn" id="pickClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="sheet-sub">Press the <b>Connect button</b> on your OBD2 adapter so it becomes discoverable, then choose it from the list. We'll remember it for next time.</p>
+    <div id="devList" class="devlist"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="rescanBtn">Rescan</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+/* ---------- theme ---------- */
+const THEME_KEY="carhelper-theme";
+(function initTheme(){
+  const saved=localStorage.getItem(THEME_KEY);
+  const prefersLight=window.matchMedia&&window.matchMedia("(prefers-color-scheme:light)").matches;
+  document.documentElement.dataset.theme = saved || (prefersLight?"light":"dark");
+})();
+$("themeBtn").onclick=()=>{
+  const next=document.documentElement.dataset.theme==="dark"?"light":"dark";
+  document.documentElement.dataset.theme=next;
+  localStorage.setItem(THEME_KEY,next);
+  drawAllSparks(); // recolor for new theme
+};
+
+/* ---------- vitals config ---------- */
+const FIELDS=[
+  {k:"COOLANT_TEMP",label:"Coolant",unit:"°C",dp:0},
+  {k:"CONTROL_MODULE_VOLTAGE",label:"Battery",unit:"V",dp:1},
+  {k:"ENGINE_LOAD",label:"Engine load",unit:"%",dp:0},
+  {k:"INTAKE_PRESSURE",label:"Manifold (MAP)",unit:"kPa",dp:0},
+  {k:"LONG_FUEL_TRIM_1",label:"LT trim · B1",unit:"%",dp:1},
+  {k:"SHORT_FUEL_TRIM_1",label:"ST trim · B1",unit:"%",dp:1},
+  {k:"LONG_FUEL_TRIM_2",label:"LT trim · B2",unit:"%",dp:1},
+  {k:"SHORT_FUEL_TRIM_2",label:"ST trim · B2",unit:"%",dp:1},
+  {k:"TIMING_ADVANCE",label:"Timing adv",unit:"°",dp:0},
+  {k:"MAF",label:"Air flow",unit:"g/s",dp:1},
+  {k:"THROTTLE_POS",label:"Throttle",unit:"%",dp:0},
+  {k:"INTAKE_TEMP",label:"Intake air",unit:"°C",dp:0},
+];
+const TRIMS=new Set(["LONG_FUEL_TRIM_1","SHORT_FUEL_TRIM_1","LONG_FUEL_TRIM_2","SHORT_FUEL_TRIM_2"]);
+const hist={};
+const refs={};
+function pushHist(k,v){ if(v==null||Number.isNaN(v))return; (hist[k]??=[]).push(v); if(hist[k].length>56)hist[k].shift(); }
+function statusFor(k,v){
+  if(v==null)return"na";
+  if(k==="COOLANT_TEMP")return v>=113?"action":v>=105?"watch":"ok";
+  if(k==="CONTROL_MODULE_VOLTAGE")return(v<=11.8||v>=15.6)?"action":(v<=12.4||v>=15.0)?"watch":"ok";
+  if(TRIMS.has(k)){const a=Math.abs(v);return a>=12?"action":a>=8?"watch":"ok";}
+  return "na";
+}
+
+/* friendly labels + units for the full detected-sensor list */
+const SENSOR_META={
+  RPM:["Engine RPM","rpm"],SPEED:["Vehicle speed","km/h"],ENGINE_LOAD:["Engine load","%"],
+  COOLANT_TEMP:["Coolant temp","°C"],THROTTLE_POS:["Throttle position","%"],
+  SHORT_FUEL_TRIM_1:["Short fuel trim B1","%"],LONG_FUEL_TRIM_1:["Long fuel trim B1","%"],
+  SHORT_FUEL_TRIM_2:["Short fuel trim B2","%"],LONG_FUEL_TRIM_2:["Long fuel trim B2","%"],
+  INTAKE_PRESSURE:["Intake MAP","kPa"],MAF:["Mass air flow","g/s"],TIMING_ADVANCE:["Timing advance","°"],
+  CONTROL_MODULE_VOLTAGE:["Module voltage","V"],INTAKE_TEMP:["Intake air temp","°C"],
+  RUN_TIME:["Run time","s"],RUN_TIME_MIL:["Run time w/ MIL","s"],DISTANCE_W_MIL:["Distance w/ MIL","km"],
+  DISTANCE_SINCE_DTC_CLEAR:["Dist since clear","km"],WARMUPS_SINCE_DTC_CLEAR:["Warm-ups since clear",""],
+  TIME_SINCE_DTC_CLEARED:["Time since clear","s"],FUEL_LEVEL:["Fuel level","%"],
+  BAROMETRIC_PRESSURE:["Barometric","kPa"],AMBIANT_AIR_TEMP:["Ambient air","°C"],
+  ABSOLUTE_LOAD:["Absolute load","%"],RELATIVE_THROTTLE_POS:["Relative throttle","%"],
+  COMMANDED_EQUIV_RATIO:["Commanded λ",""],COMMANDED_EGR:["Commanded EGR","%"],EGR_ERROR:["EGR error","%"],
+  EVAPORATIVE_PURGE:["EVAP purge","%"],CATALYST_TEMP_B1S1:["Cat temp B1S1","°C"],CATALYST_TEMP_B2S1:["Cat temp B2S1","°C"],
+  O2_B1S1:["O₂ B1S1","V"],O2_B1S2:["O₂ B1S2","V"],O2_B2S1:["O₂ B2S1","V"],O2_B2S2:["O₂ B2S2","V"],
+  FUEL_PRESSURE:["Fuel pressure","kPa"],OIL_TEMP:["Oil temp","°C"],FUEL_RATE:["Fuel rate","L/h"],
+  ETHANOL_PERCENT:["Ethanol","%"],SHORT_O2_TRIM_B1:["Short O₂ trim B1","%"],LONG_O2_TRIM_B1:["Long O₂ trim B1","%"],
+};
+function meta(k){return SENSOR_META[k]||[k.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),""];}
+const STATUS_COLOR={ok:"--teal",watch:"--watch",action:"--action",na:"--text-faint"};
+
+/* ---------- build vitals once ---------- */
+(function buildTiles(){
+  const wrap=$("vitals");
+  FIELDS.forEach(f=>{
+    const el=document.createElement("div");
+    el.className="tile";el.dataset.status="na";el.title=f.k.replaceAll("_"," ");
+    el.innerHTML=`<div class="tile-top"><span class="k">${f.label}</span><canvas width="128" height="44"></canvas></div>
+                  <div class="v"><span class="num">—</span><span class="u">${f.unit}</span></div>`;
+    wrap.appendChild(el);
+    refs[f.k]={el,num:el.querySelector(".num"),canvas:el.querySelector("canvas")};
+  });
+})();
+
+/* ---------- gauge ticks ---------- */
+(function ticks(){
+  const g=$("gTicks");const cx=100,cy=100,r1=82,r0=70;
+  for(let i=0;i<=6;i++){
+    const a=(135+ (270/6)*i)*Math.PI/180;
+    const x1=cx+r1*Math.cos(a),y1=cy+r1*Math.sin(a);
+    const x2=cx+r0*Math.cos(a),y2=cy+r0*Math.sin(a);
+    g.insertAdjacentHTML("beforeend",`<line class="tick" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`);
+  }
+})();
+const GC=2*Math.PI*82, GARC=0.75*GC;
+$("gArc").style.strokeDasharray=`0 ${GC}`;
+function setGauge(mph){
+  const frac=clamp(mph/120,0,1);
+  $("gArc").style.strokeDasharray=`${(frac*GARC).toFixed(1)} ${GC}`;
+  $("gNum").textContent=Math.round(mph);
+}
+function setTach(rpm){
+  const frac=clamp(rpm/7000,0,1);
+  const fill=$("tachFill");
+  fill.style.width=(frac*100).toFixed(1)+"%";
+  fill.className="tach-fill"+(rpm>=5500?" red":rpm>=4000?" warn":"");
+  $("tachNum").textContent=Math.round(rpm).toLocaleString();
+}
+
+/* ---------- sparklines ---------- */
+function drawSpark(canvas,arr,status){
+  const ctx=canvas.getContext("2d");
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.width=64*dpr, h=canvas.height=22*dpr;
+  ctx.clearRect(0,0,w,h);
+  if(!arr||arr.length<2)return;
+  let mn=Math.min(...arr),mx=Math.max(...arr);
+  if(mx-mn<1e-6){mn-=1;mx+=1;}
+  const pad=3*dpr;
+  const X=i=>pad+(i/(arr.length-1))*(w-2*pad);
+  const Y=v=>h-pad-((v-mn)/(mx-mn))*(h-2*pad);
+  ctx.beginPath();
+  arr.forEach((v,i)=>{const x=X(i),y=Y(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.lineWidth=1.6*dpr;ctx.lineJoin="round";ctx.lineCap="round";
+  ctx.strokeStyle=cssVar(STATUS_COLOR[status]||"--text-faint");
+  ctx.stroke();
+  const lx=X(arr.length-1),ly=Y(arr[arr.length-1]);
+  ctx.beginPath();ctx.arc(lx,ly,2*dpr,0,7);ctx.fillStyle=ctx.strokeStyle;ctx.fill();
+}
+function drawAllSparks(){ FIELDS.forEach(f=>drawSpark(refs[f.k].canvas,hist[f.k],statusFor(f.k,last(hist[f.k])))); }
+const last=a=>a&&a.length?a[a.length-1]:null;
+
+/* ---------- findings + trips icons ---------- */
+const SEV_ICON={
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01" stroke-linecap="round"/></svg>',
+  watch:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 22 20H2L12 3Z"/><path d="M12 10v4M12 17h.01" stroke-linecap="round"/></svg>',
+  action:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'
+};
+
+/* ---------- main render ---------- */
+let current=null;
+function fmtTime(s){s=Math.max(0,Math.round(s||0));const m=Math.floor(s/60);return m+":"+String(s%60).padStart(2,"0");}
+
+function render(st){
+  current=st;
+  // header
+  const mb=$("modeBadge");
+  mb.textContent=st.simulate?"SIMULATE":"LIVE";
+  mb.className="badge "+(st.simulate?"sim":"live");
+  $("dot").className="dot"+(st.connected?" on":"");
+  $("connText").textContent=st.bt_status||"disconnected";
+  $("vehicle").textContent=st.vehicle||"Vehicle diagnostics";
+
+  // deck state
+  const deck=$("deck");
+  const state=st.trip_active?"recording":st.connected?"connected":"disconnected";
+  deck.dataset.state=state;
+  const titles={disconnected:"Disconnected",connected:"Connected — ready",recording:"Recording trip"};
+  $("stateTitle").textContent=titles[state];
+  $("stateDetail").textContent=st.bt_detail||(state==="disconnected"?"Connect to your adapter to begin.":state==="connected"?"Start a trip to capture telemetry.":`Trip ${st.trip_id||""} in progress.`);
+
+  // primary action
+  const pl=$("primaryLabel"),pi=$("primaryIcon");
+  if(!st.connected){pl.textContent="Connect";pi.innerHTML='<path d="M5 12h14M13 6l6 6-6 6"/>';}
+  else if(!st.trip_active){pl.textContent="Start trip";pi.innerHTML='<circle cx="12" cy="12" r="9"/><path d="M10 8.5 16 12l-6 3.5Z" fill="currentColor" stroke="none"/>';}
+  else {pl.textContent="Stop & save";pi.innerHTML='<rect x="6" y="6" width="12" height="12" rx="2.5"/>';}
+  $("disconnectBtn").style.display=st.connected&&!st.trip_active?"inline-flex":"none";
+  $("connectNote").style.display=(!st.connected&&!st.simulate)?"flex":"none";
+
+  // saved adapter row
+  const adapter=$("adapter");
+  if(st.saved_device&&!st.simulate){
+    adapter.style.display="flex";
+    $("adapterName").textContent=st.saved_device.name||st.saved_device.mac;
+  } else adapter.style.display="none";
+
+  // HUD
+  if(st.trip_active){
+    const m=st.metrics||{};
+    $("hudTime").textContent=fmtTime(m.duration_s);
+    $("hudDist").textContent=(m.distance_mi??0).toFixed(1);
+    $("hudSamples").textContent=st.sample_count||0;
+    $("hudFind").textContent=(st.findings||[]).length;
+  }
+
+  // live
+  const live=st.latest||{};
+  setGauge((live.SPEED??0)*0.621371);
+  setTach(live.RPM??0);
+  FIELDS.forEach(f=>{
+    const v=(live[f.k]===undefined?null:live[f.k]);
+    pushHist(f.k,v);
+    const stat=statusFor(f.k,v);
+    const r=refs[f.k];
+    r.num.textContent=v==null?"—":(v).toFixed(f.dp);
+    r.el.dataset.status=stat;
+    drawSpark(r.canvas,hist[f.k],stat);
+  });
+
+  // findings
+  const f=st.findings||[];
+  if(f.length){
+    $("findings").innerHTML=f.map(x=>`
+      <div class="finding ${x.severity}">
+        <div class="ic">${SEV_ICON[x.severity]||SEV_ICON.info}</div>
+        <div class="body"><div class="row1"><span class="t">${x.title}</span><span class="sev ${x.severity}">${x.severity}</span></div>
+        <div class="d">${x.detail||""}</div></div>
+      </div>`).join("");
+  } else if(st.trip_active){
+    $("findings").innerHTML=`<div class="empty good"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>All clear — no issues flagged so far this trip.</div>`;
+  } else {
+    $("findings").innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5" stroke-linecap="round"/></svg>Start a trip to begin monitoring for issues.</div>`;
+  }
+
+  // all detected sensors
+  const sup=st.supported_pids||[];
+  $("sensorCount").textContent=sup.length?sup.length+" sensors":"";
+  $("sensors").innerHTML=sup.length?sup.map(k=>{
+    const [lab,unit]=meta(k);let v=(live[k]===undefined?null:live[k]);
+    v=(v==null)?"—":(Math.abs(v)>=100?Math.round(v):(+v).toFixed(Math.abs(v)<1&&v!==0?3:1));
+    return `<div class="sensor"><span class="sk" title="${k}">${lab}</span><span class="sv">${v}${unit?`<span class="u">${unit}</span>`:""}</span></div>`;
+  }).join(""):`<span class="muted">Connect to detect the sensors your vehicle supports.</span>`;
+}
+
+/* ---------- trips ---------- */
+const TRASH_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>';
+async function onDelete(b){
+  // two-step confirm: first click arms, second click (within 3s) deletes
+  if(!b.classList.contains("armed")){
+    b.classList.add("armed");b.textContent="Delete?";
+    b._t=setTimeout(()=>{b.classList.remove("armed");b.innerHTML=TRASH_ICON;},3000);
+    return;
+  }
+  clearTimeout(b._t);
+  const r=await postJSON("/api/trip/delete",{dir:b.dataset.dir});
+  if(r&&r.ok){toast("Trip deleted","warn");loadTrips();}
+  else toast("Couldn't delete: "+((r&&r.error)||"error"),"err");
+}
+async function loadTrips(){
+  let trips=[];
+  try{ const r=await fetch("/api/trips"); trips=(await r.json()).trips||[]; }catch(e){}
+  const box=$("trips");
+  if(!trips.length){ box.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5M4 19h16" stroke-linecap="round"/><rect x="8" y="11" width="3" height="5"/><rect x="14" y="8" width="3" height="8"/></svg>No saved trips yet — your recorded trips will appear here.</div>`; return; }
+  box.innerHTML=trips.map(t=>{
+    const c=t.finding_counts||{};
+    const dur=t.duration_s?fmtTime(t.duration_s):"—";
+    const date=(t.date||"").replace("T"," ").slice(0,16);
+    const tags=["action","watch","info"].filter(s=>c[s]).map(s=>`<span class="tag ${s}">${c[s]} ${s[0].toUpperCase()}</span>`).join("")||`<span class="tag clean">clean</span>`;
+    const notable=(t.findings||[]).filter(x=>x.severity!=="info").map(x=>x.title);
+    const ftitles=notable.length?`<div class="ftitles">${notable.join(" · ")}</div>`:"";
+    return `<div class="trip">
+      <span class="id">${t.trip_id}</span>
+      <div class="meta"><span class="dt">${date}</span>
+        <small><b>${t.distance_mi??"—"}</b> mi · <b>${dur}</b></small>${ftitles}</div>
+      <div class="tags">${tags}</div>
+      <button class="del" data-dir="${esc(t.dir||'')}" title="Delete this trip" aria-label="Delete trip">${TRASH_ICON}</button>
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".del").forEach(b=>b.onclick=()=>onDelete(b));
+}
+
+/* ---------- actions + toasts ---------- */
+function toast(msg,kind=""){
+  const el=document.createElement("div");el.className="toast "+kind;
+  el.innerHTML=`<span class="b"></span>${msg}`;
+  $("toasts").appendChild(el);
+  setTimeout(()=>{el.style.transition="opacity .3s,transform .3s";el.style.opacity="0";el.style.transform="translateY(8px)";setTimeout(()=>el.remove(),320);},2600);
+}
+async function post(p){const r=await fetch(p,{method:"POST"});return r.json();}
+async function postJSON(p,obj){const r=await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(obj||{})});return r.json();}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function connectDirect(){
+  toast("Connecting…");
+  const s=await post("/api/connect");
+  if(s.need_scan){openPicker();return;}
+  if(s.error){toast("Connection failed: "+s.error,"err");return;}
+  toast("Connected");render(s);
+}
+
+$("primaryBtn").onclick=async()=>{
+  const st=current||{};
+  if(!st.connected){
+    if(st.simulate||st.saved_device) connectDirect(); else openPicker();
+  } else if(!st.trip_active){
+    await post("/api/trip/start");toast("Trip recording started");
+  } else {
+    const r=await post("/api/trip/stop");
+    toast(r.error?("Couldn't save: "+r.error):"Trip saved to data/",r.error?"err":"");
+    loadTrips();
+  }
+};
+$("disconnectBtn").onclick=async()=>{render(await post("/api/disconnect"));toast("Disconnected","warn");};
+$("forgetBtn").onclick=async()=>{const s=await post("/api/forget");toast("Adapter forgotten","warn");render(s);};
+$("changeBtn").onclick=()=>openPicker();
+
+/* ---------- device picker ---------- */
+const picker=$("picker");
+function openPicker(){picker.hidden=false;runScan();}
+function closePicker(){picker.hidden=true;}
+$("pickClose").onclick=closePicker;
+$("rescanBtn").onclick=()=>runScan();
+picker.addEventListener("click",e=>{if(e.target===picker)closePicker();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!picker.hidden)closePicker();});
+
+async function runScan(){
+  const list=$("devList");
+  list.innerHTML=`<div class="devmsg"><div class="spinner"></div><div>Scanning for nearby devices…<br>This takes a few seconds.</div></div>`;
+  let devices=[];
+  try{const r=await post("/api/scan");if(r.error)throw new Error(r.error);devices=r.devices||[];}
+  catch(e){list.innerHTML=`<div class="devmsg">Scan failed: ${esc(e.message)}</div>`;return;}
+  if(!devices.length){list.innerHTML=`<div class="devmsg">No devices found.<br>Make sure the adapter's <b>Connect button</b> is pressed, then Rescan.</div>`;return;}
+  list.innerHTML=devices.map(d=>`
+    <button class="dev" data-mac="${esc(d.mac)}" data-name="${esc(d.name)}">
+      <span class="bt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></svg></span>
+      <span><span class="nm">${esc(d.name)}</span><span class="mc">${esc(d.mac)}</span></span>
+      <span class="go"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg></span>
+    </button>`).join("");
+  list.querySelectorAll(".dev").forEach(b=>b.onclick=()=>chooseDevice(b.dataset.mac,b.dataset.name));
+}
+async function chooseDevice(mac,name){
+  closePicker();
+  toast("Pairing "+name+"…");
+  const s=await postJSON("/api/connect",{mac,name});
+  if(s.error){toast("Couldn't connect: "+s.error,"err");return;}
+  toast("Paired & connected");render(s);
+}
+
+/* ---------- tabs + diagnostics page ---------- */
+let codesLoaded=false;
+function showView(v){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===v));
+  $("viewDashboard").hidden=(v!=="dashboard");
+  $("viewCodes").hidden=(v!=="codes");
+  if(v==="codes"&&!codesLoaded) loadCodes();
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>showView(t.dataset.view));
+$("readCodes").onclick=()=>loadCodes();
+
+const WARN_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 22 20H2L12 3Z"/><path d="M12 10v4M12 17h.01" stroke-linecap="round"/></svg>';
+const CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+async function loadCodes(){
+  const body=$("codesBody");
+  body.innerHTML=`<div class="empty"><div class="spinner"></div>Reading codes…</div>`;
+  let d;
+  try{const r=await fetch("/api/codes");d=await r.json();}
+  catch(e){body.innerHTML=`<div class="empty">Couldn't read codes.</div>`;return;}
+  if(d.error){codesLoaded=false;body.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/></svg>${esc(d.error)}</div>`;return;}
+  codesLoaded=true;renderCodes(d);
+}
+function monLabel(n){return String(n).replace(/_MONITORING$/,"").replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
+function codeRow(c,cls){return `<div class="code ${cls}"><span class="cc">${esc(c.code)}</span><span class="cd">${esc(c.description||"Unknown code")}</span></div>`;}
+function okRow(t){return `<div class="empty good">${CHECK_ICON}${t}</div>`;}
+function renderCodes(d){
+  const milOn=!!d.mil, stored=d.stored||[], pending=d.pending||[], mon=d.monitors||[];
+  const notReady=mon.filter(m=>!m.complete).length;
+  let h=`<div class="mil ${milOn?'on':'off'}"><div class="lamp">${milOn?WARN_ICON:CHECK_ICON}</div>
+    <div><b>Check engine light is ${milOn?'ON':'OFF'}</b>
+    <small>${d.dtc_count??0} stored code(s) reported · ${stored.length} read · ${pending.length} pending · ${notReady} monitor(s) not ready</small></div></div>`;
+  h+=`<div class="subhead">Stored codes (confirmed faults)</div>`;
+  h+=stored.length?stored.map(c=>codeRow(c,"")).join(""):okRow("No stored trouble codes.");
+  h+=`<div class="subhead">Pending codes (detected, not yet confirmed)</div>`;
+  h+=pending.length?pending.map(c=>codeRow(c,"pending")).join(""):okRow("No pending trouble codes.");
+  h+=`<div class="subhead">Readiness monitors</div><div class="monitors">`;
+  h+=mon.length?mon.map(m=>`<div class="mon ${m.complete?'ready':'notready'}"><span class="md"></span>${monLabel(m.name)}<span class="ms">${m.complete?'Ready':'Not ready'}</span></div>`).join(""):`<div class="empty">No monitor data reported.</div>`;
+  h+=`</div>`;
+  $("codesBody").innerHTML=h;
+}
+
+/* ---------- live socket ---------- */
+function connectWS(){
+  const proto=location.protocol==="https:"?"wss":"ws";
+  const ws=new WebSocket(`${proto}://${location.host}/ws/live`);
+  ws.onmessage=e=>{try{render(JSON.parse(e.data));}catch(err){}};
+  ws.onclose=()=>setTimeout(connectWS,1500);
+}
+fetch("/api/status").then(r=>r.json()).then(render).catch(()=>{});
+loadTrips();
+connectWS();
+</script>
+</body>
+</html>

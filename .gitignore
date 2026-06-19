@@ -1,0 +1,22 @@
+# Local env
+.env
+
+# Telemetry artifacts (keep the dir, ignore contents)
+data/*
+!data/.gitkeep
+
+# Analysis reports — personal to the vehicle (keep the dir, ignore contents)
+reports/*
+!reports/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

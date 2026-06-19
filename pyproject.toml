@@ -1,0 +1,20 @@
+[project]
+name = "carhelper"
+version = "0.1.0"
+description = "Offline, read-only OBD-II telemetry capture + rule evaluation. Artifacts are read later by Claude Code."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "obd>=0.7.2",
+    "pyserial>=3.5",
+    "pandas>=2.2",
+    "pyarrow>=15.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]

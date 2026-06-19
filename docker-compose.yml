@@ -1,0 +1,17 @@
+services:
+  carhelper:
+    build: .
+    container_name: carhelper
+    # Bluetooth from inside the container needs broad host access + the host
+    # BlueZ stack. network_mode host also makes the server bind directly on the
+    # host's :8000 (no port mapping needed).
+    privileged: true
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - /var/run/dbus:/var/run/dbus
+    # init runs a tiny PID-1 (tini) that forwards signals + reaps zombies —
+    # belt-and-suspenders for clean, fast shutdown.
+    init: true
+    restart: "no"
