@@ -51,6 +51,7 @@ class SyncClient:
         synced = state.load()
         report = SyncReport()
         url = f"{self.endpoint.rstrip('/')}/v1/trips"
+        log.info("sync push starting → %s (%d already synced)", url, len(synced))
 
         for entry in _iter_index(data_dir):
             trip_id = entry.get("trip_id")
@@ -60,20 +61,23 @@ class SyncClient:
 
             summary_path = data_dir / rel / "summary.json"
             if not summary_path.exists():
+                log.warning("trip %s: summary.json missing at %s — skipping", trip_id, summary_path)
                 report.skipped.append(trip_id)
                 continue
             payload = json.loads(summary_path.read_text())
 
+            log.debug("trip %s: POST %s", trip_id, url)
             try:
                 resp = self.transport.post_json(url, self.token, payload)
             except Exception as exc:  # noqa: BLE001 - network is retryable
-                log.warning("trip %s: transport error: %s", trip_id, exc)
+                log.warning("trip %s: transport error: %s", trip_id, exc, exc_info=True)
                 report.failed.append((trip_id, f"transport error: {exc}"))
                 continue
 
             if resp.status in (200, 201):
                 state.mark(trip_id)
                 report.pushed.append(trip_id)
+                log.debug("trip %s: synced (%s)", trip_id, resp.status)
             elif resp.status == 401:
                 # Auth is misconfigured — stop; retrying every trip won't help.
                 report.failed.append((trip_id, "unauthorized"))
@@ -85,5 +89,8 @@ class SyncClient:
                 log.warning("trip %s rejected (%s): %s", trip_id, resp.status, resp.body[:200])
             else:
                 report.failed.append((trip_id, f"server {resp.status}"))
+                log.warning("trip %s: server error %s — will retry next run", trip_id, resp.status)
 
+        log.info("sync push done: %d pushed, %d skipped, %d failed",
+                 len(report.pushed), len(report.skipped), len(report.failed))
         return report

@@ -13,10 +13,13 @@ escape ``data/trips/`` — the same traversal guard ``writer.delete_trip`` uses.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 # Default sensor columns charted in the per-trip detail view. All are numeric
 # python-OBD PIDs present in samples.parquet. NOTE: SPEED is stored in kph (see
@@ -48,6 +51,7 @@ def read_index(data_dir: str) -> list[dict[str, Any]]:
         try:
             rows.append(json.loads(line))
         except json.JSONDecodeError:
+            log.warning("skipping malformed index.jsonl line", exc_info=True)
             continue
     return rows
 
@@ -141,6 +145,7 @@ def load_series(
     try:
         import pandas as pd
     except ImportError:
+        log.debug("load_series: pandas not installed — serving detail without charts")
         return {"available": False, "reason": "pandas-missing", "count": 0, "series": {}}
 
     df = pd.read_parquet(path)
@@ -166,6 +171,7 @@ def load_series(
             ]
         except (TypeError, ValueError):
             # Skip a column that isn't cleanly numeric rather than fail the request.
+            log.debug("load_series: skipping non-numeric column %s", name, exc_info=True)
             continue
 
     return {

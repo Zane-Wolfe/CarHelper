@@ -6,9 +6,12 @@ saved adapter survives container restarts. "Forget device" clears it.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 
 def _path() -> Path:
@@ -23,6 +26,7 @@ def load() -> dict | None:
         d = json.loads(p.read_text())
         return d if d.get("mac") else None
     except Exception:
+        log.warning("could not read saved device file %s — ignoring", p, exc_info=True)
         return None
 
 

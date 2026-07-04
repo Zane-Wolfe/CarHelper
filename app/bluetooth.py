@@ -13,11 +13,14 @@ discoverable/pairable — that step cannot be automated and is surfaced to the U
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import stat
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 _MAC_RE = re.compile(r"([0-9A-F]{2}(?::[0-9A-F]{2}){5})", re.IGNORECASE)
 _PIN_PROMPT = re.compile(r"(PIN code|passkey|Enter PIN)", re.IGNORECASE)
@@ -40,6 +43,7 @@ class BluetoothManager:
 
     async def _run(self, *args: str, timeout: float = 20.0) -> tuple[int, str]:
         """Run a command, return (returncode, combined output)."""
+        log.debug("running: %s", " ".join(args))
         proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
@@ -48,6 +52,7 @@ class BluetoothManager:
         try:
             out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except TimeoutError:
+            log.warning("command timed out after %.0fs: %s", timeout, " ".join(args))
             proc.kill()
             await proc.wait()  # reap the killed child so it doesn't linger as a zombie
             return 1, "timeout"
@@ -163,8 +168,9 @@ class BluetoothManager:
         try:
             os.mknod(self.rfcomm_dev, stat.S_IFCHR | 0o644, os.makedev(major, minor))
         except FileExistsError:
-            pass
+            log.debug("rfcomm node %s already exists", self.rfcomm_dev)
         except OSError as exc:
+            log.error("could not create rfcomm node %s: %s", self.rfcomm_dev, exc)
             raise ConnectionError_(f"could not create {self.rfcomm_dev}: {exc}") from exc
 
     async def connect(self, mac: str) -> str:
@@ -176,9 +182,11 @@ class BluetoothManager:
             await self._pair_and_trust(mac)
             dev = await self._bind_rfcomm(mac)
             self._set("connected", f"Linked {mac} → {dev}")
+            log.info("bluetooth linked %s → %s", mac, dev)
             return dev
         except ConnectionError_ as exc:
             self._set("error", str(exc))
+            log.warning("bluetooth connect to %s failed: %s", mac, exc)
             raise
 
     async def disconnect(self) -> None:

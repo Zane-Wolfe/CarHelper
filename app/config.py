@@ -20,6 +20,7 @@ SAMPLE_HZ: float = float(_env("SAMPLE_HZ", "2") or "2")
 HOST: str = _env("HOST", "0.0.0.0")
 PORT: int = int(_env("PORT", "8000") or "8000")
 DATA_DIR: str = _env("DATA_DIR", "./data")
+LOG_LEVEL: str = _env("LOG_LEVEL", "INFO")
 
 # --- Bluetooth / adapter ---
 BT_MAC: str | None = _env("OBD_BT_MAC")

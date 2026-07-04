@@ -7,7 +7,10 @@ harmlessly.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 class SyncState:
@@ -20,6 +23,9 @@ class SyncState:
         try:
             data = json.loads(self.path.read_text())
         except json.JSONDecodeError:
+            # Corrupt state is non-fatal (server ingest is idempotent) — start
+            # fresh, but record it so it can be noticed.
+            log.warning("sync state %s is corrupt — treating as empty", self.path, exc_info=True)
             return set()
         return set(data.get("synced", []))
 
@@ -28,3 +34,4 @@ class SyncState:
         synced.add(trip_id)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"synced": sorted(synced)}, indent=2))
+        log.debug("marked trip %s synced (%d total) in %s", trip_id, len(synced), self.path)

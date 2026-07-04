@@ -114,9 +114,17 @@ def write_trip(trip_id, started_at, ended_at, samples, metrics, findings,
                vehicle: str | None = None) -> str:
     """Persist a finished trip. Returns the trip directory path."""
     d = _trip_dir(trip_id, started_at)
+    log.info("writing trip %s to %s (%d samples, %d findings)",
+             trip_id, d, len(samples), len(findings))
 
     if samples:
-        _write_parquet(d / "samples.parquet", samples)
+        try:
+            _write_parquet(d / "samples.parquet", samples)
+            log.debug("trip %s: wrote samples.parquet", trip_id)
+        except Exception:
+            # Re-raise (behavior unchanged) but make the failure findable.
+            log.error("trip %s: failed to write samples.parquet", trip_id, exc_info=True)
+            raise
 
     summary = schema.build_summary(
         trip_id, started_at, ended_at, metrics, findings, vehicle=vehicle
@@ -129,11 +137,13 @@ def write_trip(trip_id, started_at, ended_at, samples, metrics, findings,
         log.warning("Trip %s summary failed schema validation: %s", trip_id, exc)
     (d / "summary.json").write_text(json.dumps(summary, indent=2))
     (d / "summary.md").write_text(_summary_md(trip_id, started_at, metrics, findings, vehicle))
+    log.debug("trip %s: wrote summary.json and summary.md", trip_id)
 
     dir_rel = os.path.relpath(d, config.DATA_DIR)
     index_path = Path(config.DATA_DIR) / "index.jsonl"
     with index_path.open("a") as fh:
         fh.write(json.dumps(_index_line(trip_id, dir_rel, started_at, metrics, findings)) + "\n")
+    log.debug("trip %s: appended index.jsonl line", trip_id)
 
     return str(d)
 

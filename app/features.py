@@ -5,10 +5,13 @@ whole sample buffer so it is identical for live (buffer-so-far) and final use.
 """
 from __future__ import annotations
 
+import logging
 from statistics import mean
 from typing import Any
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 
 def _ok(v) -> bool:
@@ -35,6 +38,7 @@ def _pairs(samples: list[dict]):
 def compute(samples: list[dict], dtcs: list[dict] | None = None) -> dict[str, Any]:
     dtcs = dtcs or []
     if not samples:
+        log.debug("compute: no samples")
         return {"sample_count": 0, "dtc_count": len(dtcs), "dtcs": dtcs}
 
     duration_s = max(0.0, samples[-1]["ts"] - samples[0]["ts"])
@@ -103,6 +107,8 @@ def compute(samples: list[dict], dtcs: list[dict] | None = None) -> dict[str, An
     def r(x, n=1):
         return round(x, n) if x is not None else None
 
+    log.debug("compute: %d samples over %.0fs, %.2f mi, %d DTC(s)",
+              len(samples), duration_s, distance_mi, len(dtcs))
     return {
         "sample_count": len(samples),
         "duration_s": round(duration_s),

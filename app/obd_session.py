@@ -12,10 +12,13 @@ our candidate Mode-01 PIDs it actually supports, and watch only those.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 
 class NonReadOnlyCommandError(PermissionError):
@@ -29,10 +32,14 @@ def safe_query(connection: Any, command: Any) -> Any:
     """
     name = getattr(command, "name", str(command))
     if name not in config.READ_ONLY_COMMANDS:
+        # Reaching here means some code tried to send a non-read-only command —
+        # a safety-guard hit and a bug. Log it loudly before refusing.
+        log.error("BLOCKED non-read-only OBD command %r — refusing (read-only guard)", name)
         raise NonReadOnlyCommandError(
             f"Blocked non-read-only OBD command '{name}'. CarHelper is read-only "
             f"and must never change vehicle state."
         )
+    log.debug("safe_query %s", name)
     return connection.query(command)
 
 
@@ -77,20 +84,26 @@ class OBDSource:
         # Retry a couple of times — a freshly-bound rfcomm channel can take a
         # moment to come up on the first open.
         for _attempt in range(3):
+            log.debug("opening OBD connection on %s (attempt %d/3)", self.port, _attempt + 1)
             self._conn = await asyncio.to_thread(
                 obd.OBD, self.port, fast=False, timeout=2.0
             )
             if self._conn.is_connected():
                 break
+            log.warning("OBD not connected on %s (attempt %d/3) — retrying",
+                        self.port, _attempt + 1)
             await asyncio.to_thread(self._conn.close)
             self._conn = None
             await asyncio.sleep(1.5)
         if self._conn is None or not self._conn.is_connected():
+            log.error("could not establish OBD connection on %s after 3 attempts", self.port)
             raise ConnectionError(f"Could not establish OBD connection on {self.port}")
         # Keep only the candidate PIDs the vehicle actually supports.
         supports = self._conn.supports
         self._core = [n for n in config.CORE_PIDS if supports(_command(n))]
         self._extended = [n for n in config.EXTENDED_PIDS if supports(_command(n))]
+        log.info("OBD handshake ok on %s — %d core + %d extended supported PIDs",
+                 self.port, len(self._core), len(self._extended))
         # ELM_VOLTAGE (AT RV) is an adapter command, not an OBD PID — the vehicle
         # won't declare support for it, so we probe it once and set a flag.
         if "CONTROL_MODULE_VOLTAGE" not in self._core + self._extended:
@@ -98,8 +111,9 @@ class OBDSource:
                 resp = safe_query(self._conn, _command("ELM_VOLTAGE"))
                 if not resp.is_null():
                     self._use_elm_voltage = True
+                    log.info("using adapter ELM_VOLTAGE (AT RV) as voltage fallback")
             except Exception:
-                pass
+                log.warning("ELM_VOLTAGE voltage-fallback probe failed", exc_info=True)
 
     @property
     def supported_pids(self) -> list[str]:
@@ -120,7 +134,7 @@ class OBDSource:
                     None if resp.is_null() else _magnitude(resp.value)
                 )
             except Exception:
-                pass
+                log.warning("ELM_VOLTAGE fallback read failed", exc_info=True)
         return sample
 
     async def poll(self, full: bool = False) -> dict:
@@ -161,6 +175,7 @@ class OBDSource:
         try:
             resp = safe_query(self._conn, _command(cmd_name))
         except Exception:
+            log.warning("DTC read %s failed", cmd_name, exc_info=True)
             return []
         if resp.is_null() or not resp.value:
             return []
@@ -178,6 +193,7 @@ class OBDSource:
         try:
             resp = safe_query(self._conn, _command("VIN"))
         except Exception:
+            log.warning("VIN read failed", exc_info=True)
             return None
         return None if resp.is_null() else str(resp.value)
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
@@ -19,7 +20,10 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config, device_store, features, rules, trips_repo, writer
 from .bluetooth import BluetoothManager
+from .logconfig import setup_logging
 from .obd_session import OBDSource
+
+log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -51,17 +55,21 @@ class CaptureService:
 
     async def connect(self, mac: str | None = None, name: str | None = None) -> None:
         if self.connected:
+            log.debug("connect() ignored — already connected")
             return
         if config.SIMULATE:
             from .simulate import SimSource
 
+            log.info("connecting in SIMULATE mode")
             self.source = SimSource()
             await self.source.connect()
             self.bt.status, self.bt.detail = "connected", "SIMULATE mode"
         else:
             target = mac or (self.saved or {}).get("mac") or config.BT_MAC
             if not target:
+                log.info("connect requested but no saved adapter — UI must scan")
                 raise NeedDeviceError("No saved adapter — scan and choose your device.")
+            log.info("connecting to adapter %s", target)
             dev = await self.bt.connect(target)
             # Assign self.source only once the OBD handshake actually succeeds —
             # otherwise a failed connect() would leave a dead source attached and
@@ -71,17 +79,19 @@ class CaptureService:
             try:
                 await source.connect()
             except Exception:
+                log.exception("OBD handshake failed on %s — tearing down half-open link", dev)
                 await source.close()
                 try:
                     await self.bt.disconnect()
                 except Exception:
-                    pass
+                    log.debug("bt.disconnect() during connect cleanup failed", exc_info=True)
                 raise
             self.source = source
             nm = name or (self.saved or {}).get("name") or config.BT_NAME
             self.saved = {"mac": target, "name": nm}
             device_store.save(target, nm)
         self.supported = self.source.supported_pids
+        log.info("connected — %d supported PIDs", len(self.supported))
         self.latest = {}
         self._running = True
         self.poll_task = asyncio.create_task(self._poll_loop())
@@ -89,22 +99,27 @@ class CaptureService:
     async def read_codes(self) -> dict:
         if not self.connected:
             raise RuntimeError("Connect to the car first to read diagnostic codes.")
+        log.debug("reading diagnostic report (codes/monitors)")
         return await self.source.read_report()
 
     async def scan(self) -> list[dict]:
         if config.SIMULATE:
             return [{"mac": "SIMULATED", "name": "Simulated OBD adapter"}]
-        return await self.bt.scan_devices()
+        devices = await self.bt.scan_devices()
+        log.info("scan found %d bluetooth device(s)", len(devices))
+        return devices
 
     async def forget(self) -> None:
-        await self.disconnect()
         mac = (self.saved or {}).get("mac")
+        log.info("forgetting saved adapter %s", mac)
+        await self.disconnect()
         if not config.SIMULATE:
             await self.bt.forget(mac)
         self.saved = None
         device_store.clear()
 
     async def disconnect(self) -> None:
+        log.info("disconnecting")
         if self.trip is not None:
             await self.stop_trip()
         self._running = False
@@ -112,8 +127,10 @@ class CaptureService:
             self.poll_task.cancel()
             try:
                 await self.poll_task
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError:
                 pass
+            except Exception:
+                log.debug("poll task raised during cancellation", exc_info=True)
             self.poll_task = None
         if self.source is not None:
             await self.source.close()
@@ -137,6 +154,8 @@ class CaptureService:
             "dtcs": dtcs,
         }
         self.metrics, self.findings = {}, []
+        log.info("trip started trip_id=%s (%d pre-existing stored DTC(s))",
+                 self.trip["trip_id"], len(dtcs))
         return self.trip["trip_id"]
 
     async def stop_trip(self) -> dict | None:
@@ -150,6 +169,8 @@ class CaptureService:
             trip["samples"], metrics, findings, self.vehicle,
         )
         self.metrics, self.findings = metrics, findings
+        log.info("trip stopped trip_id=%s path=%s samples=%d findings=%d",
+                 trip["trip_id"], path, len(trip["samples"]), len(findings))
         return {"trip_id": trip["trip_id"], "path": path,
                 "metrics": metrics, "findings": findings}
 
@@ -157,6 +178,7 @@ class CaptureService:
         period = 1.0 / max(0.1, config.SAMPLE_HZ)
         once_per_sec = max(1, int(round(config.SAMPLE_HZ)))
         i = 0
+        log.debug("poll loop started (period=%.3fs)", period)
         while self._running:
             start = time.time()
             i += 1
@@ -165,9 +187,14 @@ class CaptureService:
                 full = (i % config.EXTENDED_EVERY == 0)
                 sample = await self.source.poll(full=full)
             except Exception as exc:  # keep the loop alive on transient errors
+                # Never crash mid-drive: preserve the UI detail and log the
+                # transient error (with stack trace) so it can be found later.
                 self.bt.detail = f"poll error: {exc}"
+                log.warning("transient poll error (cycle %d): %s — continuing",
+                            i, exc, exc_info=True)
                 await asyncio.sleep(period)
                 continue
+            log.debug("poll cycle %d full=%s fields=%d", i, full, len(sample))
             # Merge into latest so extended readings persist between full polls.
             self.latest = {**self.latest, **sample}
             if self.trip is not None:
@@ -203,6 +230,7 @@ class CaptureService:
             try:
                 await ws.send_text(msg)
             except Exception:
+                log.debug("dropping websocket client after send failure", exc_info=True)
                 self.clients.discard(ws)
 
 
@@ -211,13 +239,16 @@ service = CaptureService()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    setup_logging(config.LOG_LEVEL)
+    log.info("CarHelper starting (simulate=%s, sample_hz=%s)", config.SIMULATE, config.SAMPLE_HZ)
     yield
     # On shutdown: cancel the poll loop and close the OBD source so the process
     # exits promptly instead of lingering on a live connection.
+    log.info("CarHelper shutting down")
     try:
         await service.disconnect()
     except Exception:
-        pass
+        log.exception("error during shutdown disconnect")
 
 
 app = FastAPI(title="CarHelper", lifespan=lifespan)
@@ -233,13 +264,16 @@ async def connect(req: Request):
     try:
         body = await req.json()
     except Exception:
+        log.debug("connect: no/invalid JSON body, defaulting to empty", exc_info=True)
         body = {}
     try:
         await service.connect(body.get("mac"), body.get("name"))
         return service.status_payload()
     except NeedDeviceError as exc:
+        log.info("connect needs device selection: %s", exc)
         return JSONResponse(status_code=409, content={"error": str(exc), "need_scan": True})
     except Exception as exc:
+        log.exception("connect failed")
         return JSONResponse(status_code=502, content={"error": str(exc),
                                                        "bt_detail": service.bt.detail})
 
@@ -249,6 +283,7 @@ async def scan():
     try:
         return {"devices": await service.scan()}
     except Exception as exc:
+        log.exception("scan failed")
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
 
@@ -269,6 +304,7 @@ async def codes():
     try:
         return await service.read_codes()
     except Exception as exc:
+        log.exception("read_codes failed")
         return JSONResponse(status_code=409, content={"error": str(exc)})
 
 
@@ -284,6 +320,7 @@ async def trip_start():
         trip_id = await service.start_trip()
         return {"trip_id": trip_id}
     except Exception as exc:
+        log.exception("trip start failed")
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
@@ -300,14 +337,17 @@ async def trip_delete(req: Request):
     try:
         body = await req.json()
     except Exception:
+        log.debug("trip_delete: no/invalid JSON body, defaulting to empty", exc_info=True)
         body = {}
     dir_rel = body.get("dir")
     if not dir_rel:
         return JSONResponse(status_code=400, content={"error": "Missing trip dir."})
     try:
         writer.delete_trip(dir_rel)
+        log.info("deleted trip dir=%s", dir_rel)
         return {"ok": True}
     except Exception as exc:
+        log.exception("trip delete failed for dir=%s", dir_rel)
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
@@ -341,12 +381,13 @@ async def trip_series(ref: str, fields: str | None = None, max_points: int = 300
 async def ws_live(ws: WebSocket):
     await ws.accept()
     service.clients.add(ws)
+    log.debug("websocket connected (%d client(s))", len(service.clients))
     try:
         await ws.send_text(json.dumps(service.status_payload()))
         while True:
             await ws.receive_text()  # keepalive / ignore client messages
     except WebSocketDisconnect:
-        pass
+        log.debug("websocket disconnected")
     finally:
         service.clients.discard(ws)
 

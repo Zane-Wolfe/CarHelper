@@ -11,9 +11,12 @@ Claude Code reading these findings across many trips at home.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 SEVERITY_ORDER = {"info": 0, "watch": 1, "action": 2}
 
@@ -130,6 +133,7 @@ def evaluate(m: dict[str, Any]) -> list[dict]:
             high_rpm_pct=hr))
 
     out.sort(key=lambda f: SEVERITY_ORDER[f["severity"]], reverse=True)
+    log.debug("evaluate: %d finding(s) %s", len(out), severity_counts(out))
     return out
 
 
