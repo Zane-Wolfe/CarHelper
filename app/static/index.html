@@ -246,7 +246,7 @@ button{font:inherit;cursor:pointer}
 
 /* ---------- trips ---------- */
 .trip{
-  display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;
+  display:grid;grid-template-columns:auto 1fr auto auto auto;gap:14px;align-items:center;
   padding:13px 14px;border-radius:var(--r-sm);border:1px solid var(--line-soft);
   background:var(--surface-2);margin-bottom:10px;
 }
@@ -268,6 +268,30 @@ button{font:inherit;cursor:pointer}
 .tag.watch{background:color-mix(in srgb,var(--watch) 18%,transparent);color:var(--watch)}
 .tag.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
 .tag.clean{background:color-mix(in srgb,var(--teal) 15%,transparent);color:var(--teal)}
+.trip{cursor:pointer;transition:border-color .15s var(--ease),transform .15s var(--ease)}
+.trip:hover{border-color:var(--accent);transform:translateY(-1px)}
+.trip .chev{display:grid;place-items:center;color:var(--text-faint);width:20px}
+.trip .chev svg{width:16px;height:16px}
+
+/* ---------- trip detail view ---------- */
+.back{align-self:flex-start;margin-bottom:14px}
+.tdhead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;justify-content:space-between}
+.tdhead h2{margin:0;font:600 22px/1.2 var(--font-display);letter-spacing:.02em}
+.tdhead .sub{color:var(--text-dim);font-size:13.5px;margin-top:5px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tdhead .sub .veh{color:var(--text)}
+.tdchips{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.tdchips .chip{font-size:13px}
+.tdchips .chip .n{font-family:var(--font-mono);color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;margin-right:2px}
+.metric-section{margin:0 0 8px;font:600 11px/1 var(--font-display);letter-spacing:.16em;text-transform:uppercase;color:var(--text-faint)}
+.charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.chart-card{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:12px 13px}
+.chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.chart-head .ct{font:600 12px/1 var(--font-display);letter-spacing:.06em;color:var(--text-dim)}
+.chart-head .cr{font:500 11.5px/1 var(--font-mono);color:var(--text-faint);font-variant-numeric:tabular-nums}
+.chart-card canvas{width:100%;height:96px;display:block}
+.chart-legend{display:flex;gap:14px;margin-top:8px;font-size:11.5px;color:var(--text-dim)}
+.chart-legend span{display:inline-flex;align-items:center;gap:6px}
+.chart-legend i{width:12px;height:2.5px;border-radius:2px;display:inline-block}
 
 /* ---------- footer ---------- */
 .foot{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -502,6 +526,42 @@ button{font:inherit;cursor:pointer}
         </button>
       </div>
       <div id="codesBody"><div class="empty">Connect to the car, then read codes.</div></div>
+    </section>
+  </div>
+
+  <!-- trip detail view -->
+  <div id="viewTrip" class="stack" hidden>
+    <section class="panel">
+      <button class="btn ghost back" id="tripBack">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        Back to trips
+      </button>
+      <div class="tdhead">
+        <div>
+          <h2 id="tdTitle">Trip</h2>
+          <div class="sub" id="tdSub"></div>
+        </div>
+        <div class="tags" id="tdTags"></div>
+      </div>
+      <div class="tdchips" id="tdChips"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="label">Findings</h2>
+      <div id="tdFindings"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="label">Health &amp; driving metrics</h2>
+      <div class="metric-section">Health</div>
+      <div class="sensors" id="tdHealth" style="margin-bottom:16px"></div>
+      <div class="metric-section">Driving</div>
+      <div class="sensors" id="tdDriving"></div>
+    </section>
+
+    <section class="panel" id="tdChartsPanel">
+      <h2 class="label">Trip charts</h2>
+      <div class="charts" id="tdCharts"></div>
     </section>
   </div>
 
@@ -779,16 +839,163 @@ async function loadTrips(){
     const tags=["action","watch","info"].filter(s=>c[s]).map(s=>`<span class="tag ${s}">${c[s]} ${s[0].toUpperCase()}</span>`).join("")||`<span class="tag clean">clean</span>`;
     const notable=(t.findings||[]).filter(x=>x.severity!=="info").map(x=>x.title);
     const ftitles=notable.length?`<div class="ftitles">${notable.join(" · ")}</div>`:"";
-    return `<div class="trip">
+    const ref=(t.dir||"").split("/").pop();
+    return `<div class="trip" data-ref="${esc(ref)}" title="Open trip details">
       <span class="id">${t.trip_id}</span>
       <div class="meta"><span class="dt">${date}</span>
         <small><b>${t.distance_mi??"—"}</b> mi · <b>${dur}</b></small>${ftitles}</div>
       <div class="tags">${tags}</div>
+      <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>
       <button class="del" data-dir="${esc(t.dir||'')}" title="Delete this trip" aria-label="Delete trip">${TRASH_ICON}</button>
     </div>`;
   }).join("");
-  box.querySelectorAll(".del").forEach(b=>b.onclick=()=>onDelete(b));
+  box.querySelectorAll(".del").forEach(b=>b.onclick=e=>{e.stopPropagation();onDelete(b);});
+  box.querySelectorAll(".trip").forEach(row=>row.onclick=e=>{
+    if(e.target.closest(".del"))return;      // deletes are handled separately
+    const ref=row.dataset.ref;
+    if(ref) openTrip(ref);
+  });
 }
+
+/* ---------- trip detail view ---------- */
+const CHART_SPECS=[
+  {key:"SPEED",title:"Speed",unit:"mph",conv:v=>v*0.621371,color:"--teal"},
+  {key:"RPM",title:"Engine RPM",unit:"rpm",color:"--accent"},
+  {key:"COOLANT_TEMP",title:"Coolant",unit:"°C",color:"--action"},
+  {key:"CONTROL_MODULE_VOLTAGE",title:"Battery",unit:"V",color:"--info"},
+];
+const HEALTH_METRICS=[
+  {k:"coolant_max_c",label:"Coolant max",u:"°C"},
+  {k:"ltft_b1_mean_pct",label:"LT trim B1",u:"%"},
+  {k:"ltft_b2_mean_pct",label:"LT trim B2",u:"%"},
+  {k:"stft_b1_mean_pct",label:"ST trim B1",u:"%"},
+  {k:"stft_b2_mean_pct",label:"ST trim B2",u:"%"},
+  {k:"ltft_over_watch_pct",label:"Trim beyond ±8% (trip)",u:"%"},
+  {k:"voltage_min_v",label:"Voltage min",u:"V"},
+  {k:"dtc_count",label:"Stored DTCs",u:""},
+];
+const DRIVING_METRICS=[
+  {k:"distance_mi",label:"Distance",u:"mi"},
+  {k:"idle_pct",label:"Idle time",u:"%"},
+  {k:"high_rpm_pct",label:"Time >4000 rpm",u:"%"},
+  {k:"max_speed_mph",label:"Max speed",u:"mph"},
+  {k:"harsh_accel_events",label:"Harsh accels",u:""},
+  {k:"harsh_brake_events",label:"Harsh brakes",u:""},
+  {k:"est_mpg",label:"Est. MPG",u:""},
+];
+function metricRows(defs,m){
+  return defs.map(d=>{
+    const v=m[d.k];
+    const val=(v==null)?"—":(typeof v==="number"?(Number.isInteger(v)?v:(+v).toFixed(1)):esc(v));
+    return `<div class="sensor"><span class="sk">${d.label}</span><span class="sv">${val}${d.u?`<span class="u">${d.u}</span>`:""}</span></div>`;
+  }).join("");
+}
+async function openTrip(ref){
+  showView("trip");window.scrollTo(0,0);
+  $("tdFindings").innerHTML=`<div class="empty"><div class="spinner"></div>Loading trip…</div>`;
+  ["tdCharts","tdHealth","tdDriving","tdChips","tdTags"].forEach(id=>$(id).innerHTML="");
+  $("tdTitle").textContent="Trip";$("tdSub").textContent="";
+  let d;
+  try{ d=await fetch("/api/trips/"+encodeURIComponent(ref)).then(r=>r.json()); }
+  catch(e){ toast("Couldn't load trip","err");showView("dashboard");return; }
+  if(!d||d.error){ toast("Couldn't load trip: "+((d&&d.error)||"error"),"err");showView("dashboard");return; }
+  renderTripDetail(d);
+  let s={available:false};
+  try{ s=await fetch("/api/trips/"+encodeURIComponent(ref)+"/series").then(r=>r.json()); }catch(e){}
+  renderTripCharts(s);
+}
+function renderTripDetail(d){
+  const m=d.metrics||{};
+  $("tdTitle").textContent="Trip "+(d.trip_id||d.ref);
+  const date=(d.date||"").replace("T"," ").slice(0,16);
+  const sub=[date]; if(d.vehicle) sub.push(`<span class="veh">${esc(d.vehicle)}</span>`);
+  $("tdSub").innerHTML=sub.filter(Boolean).join(" · ");
+  const c=d.finding_counts||{};
+  $("tdTags").innerHTML=["action","watch","info"].filter(s=>c[s]).map(s=>`<span class="tag ${s}">${c[s]} ${s[0].toUpperCase()}</span>`).join("")||`<span class="tag clean">clean</span>`;
+  const dur=m.duration_s?fmtTime(m.duration_s):"—";
+  const chips=[
+    [dur,"elapsed"],[m.distance_mi,"mi"],[m.est_mpg,"est mpg"],
+    [m.max_speed_mph,"mph max"],[m.sample_count,"samples"],
+  ];
+  $("tdChips").innerHTML=chips.map(([v,lbl])=>`<span class="chip"><span class="n">${v??"—"}</span>${lbl}</span>`).join("");
+  const f=d.findings||[];
+  $("tdFindings").innerHTML=f.length?f.map(x=>`
+    <div class="finding ${x.severity}">
+      <div class="ic">${SEV_ICON[x.severity]||SEV_ICON.info}</div>
+      <div class="body"><div class="row1"><span class="t">${esc(x.title)}</span><span class="sev ${x.severity}">${esc(x.severity)}</span></div>
+      <div class="d">${esc(x.detail||"")}</div></div>
+    </div>`).join(""):`<div class="empty good">${CHECK_ICON}No issues flagged on this trip.</div>`;
+  $("tdHealth").innerHTML=metricRows(HEALTH_METRICS,m);
+  $("tdDriving").innerHTML=metricRows(DRIVING_METRICS,m);
+}
+function renderTripCharts(s){
+  const box=$("tdCharts");
+  if(!s||!s.available){
+    const reason=(s&&s.reason==="pandas-missing")
+      ? "Charts need pandas/pyarrow installed on the device."
+      : "No raw samples were saved for this trip.";
+    box.innerHTML=`<div class="empty">${reason}</div>`;return;
+  }
+  const ser=s.series||{};
+  const cards=[];
+  CHART_SPECS.forEach(spec=>{
+    const raw=ser[spec.key];
+    if(!raw||!raw.some(v=>v!=null))return;
+    const data=raw.map(v=>v==null?null:(spec.conv?spec.conv(v):v));
+    cards.push(chartCard(spec.title,spec.unit,[{data,color:spec.color}],false));
+  });
+  const b1=ser.LONG_FUEL_TRIM_1,b2=ser.LONG_FUEL_TRIM_2;
+  if((b1&&b1.some(v=>v!=null))||(b2&&b2.some(v=>v!=null))){
+    cards.push(chartCard("Long fuel trim","%",[
+      {data:b1||[],color:"--info",label:"B1"},
+      {data:b2||[],color:"--watch",label:"B2"},
+    ],true));
+  }
+  box.innerHTML="";
+  if(!cards.length){box.innerHTML=`<div class="empty">No chartable series in this trip.</div>`;return;}
+  cards.forEach(card=>box.appendChild(card));
+}
+function niceRange(vals,zero){
+  let mn=Math.min(...vals),mx=Math.max(...vals);
+  if(!isFinite(mn)||!isFinite(mx)){mn=0;mx=1;}
+  if(zero){mn=Math.min(mn,0);mx=Math.max(mx,0);}
+  if(mx-mn<1e-6){mn-=1;mx+=1;}
+  const pad=(mx-mn)*0.08;return [mn-pad,mx+pad];
+}
+function fmtNum(v){return Math.abs(v)>=100?Math.round(v):(+v).toFixed(1);}
+function chartCard(title,unit,lines,zero){
+  const card=document.createElement("div");card.className="chart-card";
+  const all=lines.flatMap(l=>l.data).filter(v=>v!=null);
+  const [mn,mx]=niceRange(all,zero);
+  const legend=lines.length>1
+    ?`<div class="chart-legend">${lines.map(l=>`<span><i style="background:${cssVar(l.color)}"></i>${esc(l.label||"")}</span>`).join("")}</div>`:"";
+  card.innerHTML=`<div class="chart-head"><span class="ct">${esc(title)}</span><span class="cr">${fmtNum(mn)}–${fmtNum(mx)} ${unit}</span></div><canvas></canvas>${legend}`;
+  const canvas=card.querySelector("canvas");
+  // Draw once the card is laid out in the DOM (need clientWidth for a crisp canvas).
+  requestAnimationFrame(()=>lines.forEach((l,i)=>drawLineChart(canvas,l.data,l.color,mn,mx,zero,i>0)));
+  return card;
+}
+function drawLineChart(canvas,arr,color,mn,mx,zero,overlay){
+  const dpr=window.devicePixelRatio||1;
+  if(!overlay){canvas.width=(canvas.clientWidth||260)*dpr;canvas.height=96*dpr;}
+  const ctx=canvas.getContext("2d");
+  const w=canvas.width,h=canvas.height,pad=6*dpr;
+  if(!overlay)ctx.clearRect(0,0,w,h);
+  const X=i=>pad+(i/Math.max(1,arr.length-1))*(w-2*pad);
+  const Y=v=>h-pad-((v-mn)/(mx-mn))*(h-2*pad);
+  if(zero&&!overlay&&mn<0&&mx>0){
+    ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(w-pad,Y(0));
+    ctx.strokeStyle=cssVar("--line");ctx.lineWidth=dpr;ctx.setLineDash([3*dpr,3*dpr]);ctx.stroke();ctx.setLineDash([]);
+  }
+  ctx.beginPath();let started=false;
+  arr.forEach((v,i)=>{
+    if(v==null){started=false;return;}
+    const x=X(i),y=Y(v);
+    if(started)ctx.lineTo(x,y);else{ctx.moveTo(x,y);started=true;}
+  });
+  ctx.strokeStyle=cssVar(color);ctx.lineWidth=1.8*dpr;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke();
+}
+$("tripBack").onclick=()=>showView("dashboard");
 
 /* ---------- actions + toasts ---------- */
 function toast(msg,kind=""){
@@ -863,6 +1070,7 @@ function showView(v){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===v));
   $("viewDashboard").hidden=(v!=="dashboard");
   $("viewCodes").hidden=(v!=="codes");
+  $("viewTrip").hidden=(v!=="trip");
   if(v==="codes"&&!codesLoaded) loadCodes();
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>showView(t.dataset.view));

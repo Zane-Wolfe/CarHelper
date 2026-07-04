@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, device_store, features, rules, writer
+from . import config, device_store, features, rules, trips_repo, writer
 from .bluetooth import BluetoothManager
 from .obd_session import OBDSource
 
@@ -313,11 +313,28 @@ async def trip_delete(req: Request):
 
 @app.get("/api/trips")
 async def trips(limit: int = 20):
-    index = Path(config.DATA_DIR) / "index.jsonl"
-    if not index.exists():
-        return {"trips": []}
-    lines = index.read_text().splitlines()[-limit:]
-    return {"trips": [json.loads(line) for line in reversed(lines) if line.strip()]}
+    return {"trips": trips_repo.list_trips(config.DATA_DIR, limit)}
+
+
+@app.get("/api/trips/{ref}")
+async def trip_detail(ref: str):
+    """Full detail for one saved trip (read-only): metrics, findings, summary."""
+    try:
+        return trips_repo.load_trip(config.DATA_DIR, ref)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    except FileNotFoundError:
+        return JSONResponse(status_code=404, content={"error": "Trip not found."})
+
+
+@app.get("/api/trips/{ref}/series")
+async def trip_series(ref: str, fields: str | None = None, max_points: int = 300):
+    """Downsampled per-sample time series for the trip's charts (read-only)."""
+    field_list = [f for f in (fields or "").split(",") if f] or None
+    try:
+        return trips_repo.load_series(config.DATA_DIR, ref, field_list, max_points)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 @app.websocket("/ws/live")
