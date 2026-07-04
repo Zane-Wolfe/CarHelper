@@ -67,7 +67,8 @@ class SimSource:
             "ABSOLUTE_LOAD": round(20 + random.uniform(-2, 2), 1),
             "RELATIVE_THROTTLE_POS": round(8 + random.uniform(-1, 1), 1),
             "COMMANDED_EQUIV_RATIO": round(0.99 + random.uniform(-0.02, 0.02), 3),
-            "COMMANDED_EGR": round(random.uniform(0, 6), 1), "EGR_ERROR": round(random.uniform(-3, 3), 1),
+            "COMMANDED_EGR": round(random.uniform(0, 6), 1),
+            "EGR_ERROR": round(random.uniform(-3, 3), 1),
             "EVAPORATIVE_PURGE": round(random.uniform(0, 20), 1),
             "CATALYST_TEMP_B1S1": round(430 + random.uniform(-30, 30), 1),
             "CATALYST_TEMP_B2S1": round(425 + random.uniform(-30, 30), 1),
@@ -105,8 +106,11 @@ class SimSource:
             "ignition_type": "spark",
             "monitors": [{"name": n, "complete": i < 5} for i, n in enumerate(mon)],
             "stored": self._stored(),
-            "pending": ([{"code": "P0300", "description": "Random/Multiple Cylinder Misfire Detected"}]
-                        if 70 < e < 95 else []),
+            "pending": (
+                [{"code": "P0300", "description": "Random/Multiple Cylinder Misfire Detected"}]
+                if 70 < e < 95
+                else []
+            ),
             "supported_count": len(config.CANDIDATE_PIDS),
         }
 

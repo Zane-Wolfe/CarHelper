@@ -68,6 +68,7 @@ class OBDSource:
         # Serializes all access to the single serial connection — the live poll
         # loop and an on-demand codes read must never query the ECU at once.
         self._lock = asyncio.Lock()
+        self._use_elm_voltage: bool = False  # fallback when ECU doesn't support PID 0x42
 
     async def connect(self) -> None:
         import obd
@@ -75,7 +76,7 @@ class OBDSource:
         # fast=False keeps a conservative, well-supported query cadence.
         # Retry a couple of times — a freshly-bound rfcomm channel can take a
         # moment to come up on the first open.
-        for attempt in range(3):
+        for _attempt in range(3):
             self._conn = await asyncio.to_thread(
                 obd.OBD, self.port, fast=False, timeout=2.0
             )
@@ -90,6 +91,15 @@ class OBDSource:
         supports = self._conn.supports
         self._core = [n for n in config.CORE_PIDS if supports(_command(n))]
         self._extended = [n for n in config.EXTENDED_PIDS if supports(_command(n))]
+        # ELM_VOLTAGE (AT RV) is an adapter command, not an OBD PID — the vehicle
+        # won't declare support for it, so we probe it once and set a flag.
+        if "CONTROL_MODULE_VOLTAGE" not in self._core + self._extended:
+            try:
+                resp = safe_query(self._conn, _command("ELM_VOLTAGE"))
+                if not resp.is_null():
+                    self._use_elm_voltage = True
+            except Exception:
+                pass
 
     @property
     def supported_pids(self) -> list[str]:
@@ -101,6 +111,16 @@ class OBDSource:
         for name in pids:
             resp = safe_query(self._conn, _command(name))
             sample[name] = None if resp.is_null() else _magnitude(resp.value)
+        # If CONTROL_MODULE_VOLTAGE wasn't in the vehicle's supported PIDs, use the
+        # adapter's own AT RV reading (OBD-II pin 16 = battery voltage) as a fallback.
+        if self._use_elm_voltage and sample.get("CONTROL_MODULE_VOLTAGE") is None:
+            try:
+                resp = safe_query(self._conn, _command("ELM_VOLTAGE"))
+                sample["CONTROL_MODULE_VOLTAGE"] = (
+                    None if resp.is_null() else _magnitude(resp.value)
+                )
+            except Exception:
+                pass
         return sample
 
     async def poll(self, full: bool = False) -> dict:

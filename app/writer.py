@@ -8,12 +8,15 @@ samples.parquet is raw drill-down only.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
-from . import config, rules
+from . import config, rules, schema
+
+log = logging.getLogger(__name__)
 
 
 def _fmt_duration(seconds: float | int | None) -> str:
@@ -70,7 +73,8 @@ def _summary_md(trip_id, started_at, metrics, findings, vehicle) -> str:
         f"distance {dist} mi · idle {metrics.get('idle_pct')}% · "
         f"time >{config.THRESHOLDS['rpm_high']}rpm {metrics.get('high_rpm_pct')}% · "
         f"max speed {metrics.get('max_speed_mph')} mph · "
-        f"harsh accel/brake {metrics.get('harsh_accel_events')}/{metrics.get('harsh_brake_events')} · "
+        f"harsh accel/brake {metrics.get('harsh_accel_events')}/"
+        f"{metrics.get('harsh_brake_events')} · "
         f"est MPG {metrics.get('est_mpg')}"
     )
     return "\n".join(lines) + "\n"
@@ -114,14 +118,15 @@ def write_trip(trip_id, started_at, ended_at, samples, metrics, findings,
     if samples:
         _write_parquet(d / "samples.parquet", samples)
 
-    summary = {
-        "trip_id": trip_id,
-        "started_at": started_at,
-        "ended_at": ended_at,
-        "vehicle": vehicle,
-        "metrics": metrics,
-        "findings": findings,
-    }
+    summary = schema.build_summary(
+        trip_id, started_at, ended_at, metrics, findings, vehicle=vehicle
+    )
+    # Validate best-effort: a schema mismatch must never lose the trip data or
+    # crash the device while driving, so we log and still write the artifact.
+    try:
+        schema.validate_summary(summary)
+    except schema.SummaryValidationError as exc:
+        log.warning("Trip %s summary failed schema validation: %s", trip_id, exc)
     (d / "summary.json").write_text(json.dumps(summary, indent=2))
     (d / "summary.md").write_text(_summary_md(trip_id, started_at, metrics, findings, vehicle))
 

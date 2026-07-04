@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  device:
+    name: Device (lint + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # The capture/rules/storage path stays minimal; tests need only the schema
+      # validator + test/lint tooling, not the full runtime (obd, pandas, ...).
+      - run: pip install jsonschema pytest ruff
+      - run: ruff check app sync tests
+      - run: python -m pytest

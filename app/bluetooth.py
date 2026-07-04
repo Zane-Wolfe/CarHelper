@@ -47,7 +47,7 @@ class BluetoothManager:
         )
         try:
             out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()  # reap the killed child so it doesn't linger as a zombie
             return 1, "timeout"
@@ -102,7 +102,7 @@ class BluetoothManager:
             while asyncio.get_event_loop().time() < deadline:
                 try:
                     raw = await asyncio.wait_for(proc.stdout.readline(), timeout=5)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 if not raw:
                     break
@@ -122,7 +122,7 @@ class BluetoothManager:
             await send("quit")
             try:
                 await asyncio.wait_for(proc.wait(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
         if not paired:
             raise ConnectionError_(
@@ -165,7 +165,7 @@ class BluetoothManager:
         except FileExistsError:
             pass
         except OSError as exc:
-            raise ConnectionError_(f"could not create {self.rfcomm_dev}: {exc}")
+            raise ConnectionError_(f"could not create {self.rfcomm_dev}: {exc}") from exc
 
     async def connect(self, mac: str) -> str:
         """Pair (if needed), connect, and bind the given device. Returns serial path."""

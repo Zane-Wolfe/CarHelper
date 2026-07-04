@@ -26,7 +26,7 @@ def _pairs(samples: list[dict]):
     dt must be positive and within MAX_SAMPLE_GAP_S — larger gaps are a
     pause/dropout, not continuous driving, and are skipped.
     """
-    for a, b in zip(samples, samples[1:]):
+    for a, b in zip(samples, samples[1:], strict=False):
         dt = b["ts"] - a["ts"]
         if 0 < dt < config.MAX_SAMPLE_GAP_S:
             yield a, b, dt

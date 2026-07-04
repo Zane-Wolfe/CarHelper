@@ -90,7 +90,8 @@ def evaluate(m: dict[str, Any]) -> list[dict]:
         detail += (" Large trims can indicate an air/vacuum leak, fuel-delivery, or sensor "
                    "issue. If only one bank is affected, the cause is usually on that bank.")
         out.append(_finding("fuel_trim", "health", sev, "Fuel trim outside normal range",
-                            detail, over_watch_pct=over_watch, over_action_pct=over_action, **trims))
+                            detail, over_watch_pct=over_watch,
+                            over_action_pct=over_action, **trims))
 
     # --- Charging/battery voltage (health) ---
     vmin, vmax = m.get("voltage_min_v"), m.get("voltage_max_v")

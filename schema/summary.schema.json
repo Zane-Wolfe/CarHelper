@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://carhelper.dev/schema/summary/v1.json",
+  "title": "CarHelper trip summary",
+  "description": "Versioned per-trip summary written by the in-car device and consumed by the cloud sync/analysis service. This file is the device↔cloud contract AND the promise to self-hosters. Treat any change to it as a breaking API change and bump schema_version.",
+  "type": "object",
+  "required": ["schema_version", "trip_id", "started_at", "metrics", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Contract version. Bumped on any breaking change to this shape."
+    },
+    "trip_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Device-local unique id for the trip (e.g. t76848)."
+    },
+    "started_at": {
+      "type": "number",
+      "description": "Unix epoch seconds when capture began."
+    },
+    "ended_at": {
+      "type": ["number", "null"],
+      "description": "Unix epoch seconds when capture ended; null if unknown."
+    },
+    "vehicle": {
+      "type": ["string", "null"],
+      "maxLength": 256,
+      "description": "Free-text vehicle descriptor, or null if unset on the device."
+    },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "description": "Rolled-up numeric metrics. Every field is nullable: older/J1850 ECUs report fewer PIDs, and short trips may not compute all metrics.",
+      "additionalProperties": false,
+      "properties": {
+        "sample_count": { "type": ["integer", "null"], "minimum": 0 },
+        "duration_s": { "type": ["number", "null"], "minimum": 0 },
+        "distance_mi": { "type": ["number", "null"], "minimum": 0 },
+        "idle_pct": { "$ref": "#/$defs/percent" },
+        "high_rpm_pct": { "$ref": "#/$defs/percent" },
+        "max_speed_mph": { "type": ["number", "null"], "minimum": 0 },
+        "coolant_max_c": { "type": ["number", "null"] },
+        "ltft_b1_mean_pct": { "type": ["number", "null"] },
+        "stft_b1_mean_pct": { "type": ["number", "null"] },
+        "ltft_b2_mean_pct": { "type": ["number", "null"] },
+        "stft_b2_mean_pct": { "type": ["number", "null"] },
+        "ltft_over_watch_pct": { "$ref": "#/$defs/percent" },
+        "ltft_over_action_pct": { "$ref": "#/$defs/percent" },
+        "voltage_min_v": { "type": ["number", "null"], "minimum": 0 },
+        "voltage_max_v": { "type": ["number", "null"], "minimum": 0 },
+        "harsh_accel_events": { "type": ["integer", "null"], "minimum": 0 },
+        "harsh_brake_events": { "type": ["integer", "null"], "minimum": 0 },
+        "est_mpg": { "type": ["number", "null"], "minimum": 0 },
+        "dtc_count": { "type": ["integer", "null"], "minimum": 0 },
+        "dtcs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dtc" }
+        }
+      }
+    },
+    "dtc": {
+      "type": "object",
+      "required": ["code"],
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Diagnostic trouble code, e.g. P0171."
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "description": "A single rule-engine finding. Deliberately conservative: rules only flag threshold crossings; trend judgement is left to the cloud/Claude.",
+      "required": ["code", "category", "severity", "title", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "enum": ["health", "performance", "habits"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "watch", "action"]
+        },
+        "title": { "type": "string" },
+        "detail": { "type": "string" },
+        "evidence": {
+          "type": "object",
+          "description": "Freeform per-finding evidence bag; shape varies by rule.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "percent": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}
