@@ -61,7 +61,8 @@ EXTENDED_EVERY: int = 10
 READ_ONLY_COMMANDS: frozenset[str] = frozenset(
     set(CANDIDATE_PIDS)
     | {"GET_DTC", "GET_CURRENT_DTC", "STATUS", "FUEL_STATUS", "VIN",
-       "PIDS_A", "PIDS_B", "PIDS_C", "OBD_COMPLIANCE"}
+       "PIDS_A", "PIDS_B", "PIDS_C", "OBD_COMPLIANCE",
+       "ELM_VOLTAGE"}  # AT RV — adapter reads OBD-II pin 16 voltage; safe read-only fallback
 )
 
 # --- Rule thresholds (consumed by app/rules.py) ---

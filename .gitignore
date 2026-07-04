@@ -16,6 +16,9 @@ __pycache__/
 .venv/
 venv/
 
+# Personal build notes / docs — not part of the shipped project
+docs/
+
 # Editor / OS
 .idea/
 .vscode/
